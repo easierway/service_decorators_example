@@ -2,7 +2,6 @@
 package service_decorators_example
 
 import (
-	"calculator_thrift"
 	"context"
 	"errors"
 	"net"
@@ -28,38 +27,45 @@ func addServiceImpl(req service_decorators.Request) (service_decorators.Response
 }
 
 const (
-	//NetworkAddr : service binds network address
-	NetworkAddr = "127.0.0.1:9090"
 	Host        = "127.0.0.1"
 	Port        = "9090"
+	NetworkAddr = Host + ":" + Port
 )
 
+//calculatorServiceHandler is RPC hanlder
 type calculatorServiceHandler struct {
 	serviceImpl service_decorators.ServiceFunc
 }
 
+//addfallback is the fallback function for CircuitBreakDecorator
 func addFallback(req service_decorators.Request, err error) (service_decorators.Response, error) {
 	return 0, nil
 }
 
+//decorateCoreLogic is to decorate the core logic with the prebuilt decorators
 func decorateCoreLogic(innerFn service_decorators.ServiceFunc) (service_decorators.ServiceFunc, error) {
-	rateLimitDec, err := service_decorators.CreateRateLimitDecorator(time.Millisecond*1, 100)
-	if err != nil {
+	var (
+		rateLimitDec    *service_decorators.RateLimitDecorator
+		circuitBreakDec *service_decorators.CircuitBreakDecorator
+		metricDec       *service_decorators.MetricDecorator
+		err             error
+	)
+	if rateLimitDec, err = service_decorators.CreateRateLimitDecorator(time.Millisecond*1, 100); err != nil {
 		return nil, err
 	}
-	circuitBreakDec, err := service_decorators.CreateCircuitBreakDecorator().
+
+	if circuitBreakDec, err = service_decorators.CreateCircuitBreakDecorator().
 		WithTimeout(time.Millisecond * 100).
 		WithMaxCurrentRequests(1000).
 		WithTimeoutFallbackFunction(addFallback).
 		WithBeyondMaxConcurrencyFallbackFunction(addFallback).
-		Build()
-	if err != nil {
+		Build(); err != nil {
 		return nil, err
 	}
+
 	gmet := g_met.CreateGMetInstanceByDefault("g_met_config/gmet_config.xml")
-	metricDec, err := service_decorators.CreateMetricDecorator(gmet).
-		NeedsRecordingTimeSpent().Build()
-	if err != nil {
+	if metricDec, err = service_decorators.CreateMetricDecorator(gmet).
+		NeedsRecordingTimeSpent().Build(); err != nil {
 		return nil, err
 	}
 	decFn := rateLimitDec.Decorate(
@@ -69,18 +75,27 @@ func decorateCoreLogic(innerFn service_decorators.ServiceFunc) (service_decorato
 	return decFn, nil
 }
 
-func (c *calculatorServiceHandler) Add(ctx context.Context,
-	req *calculator_thrift.Request) (r int32, err error) {
-	if err != nil {
-		return
-	}
-	innerReq := addServiceRequest{
+//decode RPC request
+func decodeRPCRequest(req *Request) service_decorators.Request {
+	return addServiceRequest{
 		op1: int(req.GetOp1()),
 		op2: int(req.GetOp2()),
 	}
-	innerResp, err := c.serviceImpl(innerReq)
-	resp := int32(innerResp.(int))
-	return resp, err
+}
+
+//encode the result to RPC response
+func encodeRPCResponse(innerResp *service_decorators.Response) int32 {
+	return int32((*innerResp).(int))
+}
+
+//Add is RPC handler function
+func (c *calculatorServiceHandler) Add(ctx context.Context,
+	req *Request) (r int32, err error) {
+	if err != nil {
+		return
+	}
+	innerResp, err := c.serviceImpl(decodeRPCRequest(req))
+	return encodeRPCResponse(&innerResp), err
 }
 
 func createCalculatorServiceHandler() (*calculatorServiceHandler, error) {
@@ -91,6 +106,7 @@ func createCalculatorServiceHandler() (*calculatorServiceHandler, error) {
 	return &calculatorServiceHandler{decServiceFn}, nil
 }
 
+//Start service via RPC endpoint
 func startServiceServer(t *testing.T) {
 	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
@@ -102,12 +118,13 @@ func startServiceServer(t *testing.T) {
 	if err != nil {
 		t.Error("failed to create service handler", err)
 	}
-	processor := calculator_thrift.NewCalculatorProcessor(serviceHandler)
+	processor := NewCalculatorProcessor(serviceHandler)
 	server := thrift.NewTSimpleServer4(processor, serverTransport, transportFactory, protocolFactory)
 	t.Log("thrift server in", NetworkAddr)
 	server.Serve()
 }
 
+//Call the service
 func startTestClient(t *testing.T) {
 	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
