@@ -50,7 +50,7 @@ func decorateCoreLogic(innerFn service_decorators.ServiceFunc) (service_decorato
 		metricDec       *service_decorators.MetricDecorator
 		err             error
 	)
-	if rateLimitDec, err = service_decorators.CreateRateLimitDecorator(time.Millisecond*1, 100); err != nil {
+	if rateLimitDec, err = service_decorators.CreateRateLimitDecorator(time.Millisecond*1, 100, 100); err != nil {
 		return nil, err
 	}
 
