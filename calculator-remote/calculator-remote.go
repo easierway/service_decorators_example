@@ -14,7 +14,7 @@ import (
         "strconv"
         "strings"
         "git.apache.org/thrift.git/lib/go/thrift"
-        "service_decorators_example"
+        "github.com/easierway/service_decorators_example"
 )
 
 

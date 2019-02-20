@@ -1,4 +1,4 @@
-//Here is to demostrate how to use "github.com/easierway/service_decorators" to simplify the microservice development
+// Here is to demostrate how to use "github.com/easierway/service_decorators" to simplify the microservice development
 package service_decorators_example
 
 import (
@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"git.apache.org/thrift.git/lib/go/thrift"
-	"github.com/easierway/g_met"
 	"github.com/easierway/service_decorators"
 )
 
@@ -32,23 +31,23 @@ const (
 	NetworkAddr = Host + ":" + Port
 )
 
-//calculatorServiceHandler is RPC hanlder
+// calculatorServiceHandler is RPC hanlder
 type calculatorServiceHandler struct {
 	serviceImpl service_decorators.ServiceFunc
 }
 
-//addfallback is the fallback function for CircuitBreakDecorator
+// addfallback is the fallback function for CircuitBreakDecorator
 func addFallback(req service_decorators.Request, err error) (service_decorators.Response, error) {
 	return 0, nil
 }
 
-//decorateCoreLogic is to decorate the core logic with the prebuilt decorators
+// decorateCoreLogic is to decorate the core logic with the prebuilt decorators
 func decorateCoreLogic(innerFn service_decorators.ServiceFunc) (service_decorators.ServiceFunc, error) {
 	var (
 		rateLimitDec    *service_decorators.RateLimitDecorator
 		circuitBreakDec *service_decorators.CircuitBreakDecorator
-		metricDec       *service_decorators.MetricDecorator
-		err             error
+		// metricDec       *service_decorators.MetricDecorator
+		err error
 	)
 	if rateLimitDec, err = service_decorators.CreateRateLimitDecorator(time.Millisecond*1, 100, 100); err != nil {
 		return nil, err
@@ -63,19 +62,18 @@ func decorateCoreLogic(innerFn service_decorators.ServiceFunc) (service_decorato
 		return nil, err
 	}
 
-	gmet := g_met.CreateGMetInstanceByDefault("g_met_config/gmet_config.xml")
-	if metricDec, err = service_decorators.CreateMetricDecorator(gmet).
-		NeedsRecordingTimeSpent().Build(); err != nil {
-		return nil, err
-	}
+	// gmet := g_met.CreateGMetInstanceByDefault("g_met_config/gmet_config.xml")
+	// if metricDec, err = service_decorators.CreateMetricDecorator(gmet).
+	// 	NeedsRecordingTimeSpent().Build(); err != nil {
+	// 	return nil, err
+	// }
 	decFn := rateLimitDec.Decorate(
 		circuitBreakDec.Decorate(
-			metricDec.Decorate(
-				innerFn)))
+			innerFn))
 	return decFn, nil
 }
 
-//decode RPC request
+// decode RPC request
 func decodeRPCRequest(req *Request) service_decorators.Request {
 	return addServiceRequest{
 		op1: int(req.GetOp1()),
@@ -83,12 +81,12 @@ func decodeRPCRequest(req *Request) service_decorators.Request {
 	}
 }
 
-//encode the result to RPC response
+// encode the result to RPC response
 func encodeRPCResponse(innerResp *service_decorators.Response) int32 {
 	return int32((*innerResp).(int))
 }
 
-//Add is RPC handler function
+// Add is RPC handler function
 func (c *calculatorServiceHandler) Add(ctx context.Context,
 	req *Request) (r int32, err error) {
 	if err != nil {
@@ -106,7 +104,7 @@ func createCalculatorServiceHandler() (*calculatorServiceHandler, error) {
 	return &calculatorServiceHandler{decServiceFn}, nil
 }
 
-//Start service via RPC endpoint
+// Start service via RPC endpoint
 func startServiceServer(t *testing.T) {
 	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
@@ -124,7 +122,7 @@ func startServiceServer(t *testing.T) {
 	server.Serve()
 }
 
-//Call the service
+// Call the service
 func startTestClient(t *testing.T) {
 	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
@@ -135,7 +133,9 @@ func startTestClient(t *testing.T) {
 	}
 
 	useTransport, _ := transportFactory.GetTransport(transport)
-	client := NewCalculatorClientFactory(useTransport, protocolFactory)
+	iprotocol := protocolFactory.GetProtocol(useTransport)
+	oprotocol := protocolFactory.GetProtocol(useTransport)
+	client := NewCalculatorClient(thrift.NewTStandardClient(iprotocol, oprotocol))
 
 	if err = transport.Open(); err != nil {
 		t.Error("Error opening socket to "+Host+":"+Port, " ", err)
