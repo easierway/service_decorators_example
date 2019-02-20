@@ -3,7 +3,7 @@
 
    <buffered formatid="common" size="10000" flushperiod="1000">
 
-   <rollingfile type="date" filename="./test.log" datepattern="2006.02.01.15" fullname="true" maxrolls="30"/>
+   <rollingfile type="date" filename="./test.log" datepattern="2006.02.01.15" maxrolls="30"/>
 
    </buffered>
 

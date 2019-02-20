@@ -4,6 +4,7 @@ package service_decorators_example
 import (
 	"context"
 	"errors"
+	"github.com/easierway/g_met"
 	"net"
 	"testing"
 	"time"
@@ -46,8 +47,8 @@ func decorateCoreLogic(innerFn service_decorators.ServiceFunc) (service_decorato
 	var (
 		rateLimitDec    *service_decorators.RateLimitDecorator
 		circuitBreakDec *service_decorators.CircuitBreakDecorator
-		// metricDec       *service_decorators.MetricDecorator
-		err error
+		metricDec       *service_decorators.MetricDecorator
+		err             error
 	)
 	if rateLimitDec, err = service_decorators.CreateRateLimitDecorator(time.Millisecond*1, 100, 100); err != nil {
 		return nil, err
@@ -62,14 +63,15 @@ func decorateCoreLogic(innerFn service_decorators.ServiceFunc) (service_decorato
 		return nil, err
 	}
 
-	// gmet := g_met.CreateGMetInstanceByDefault("g_met_config/gmet_config.xml")
-	// if metricDec, err = service_decorators.CreateMetricDecorator(gmet).
-	// 	NeedsRecordingTimeSpent().Build(); err != nil {
-	// 	return nil, err
-	// }
+	gmet := g_met.CreateGMetInstanceByDefault("g_met_config/gmet_config.xml")
+	if metricDec, err = service_decorators.CreateMetricDecorator(gmet).
+		NeedsRecordingTimeSpent().Build(); err != nil {
+		return nil, err
+	}
 	decFn := rateLimitDec.Decorate(
 		circuitBreakDec.Decorate(
-			innerFn))
+			metricDec.Decorate(
+			innerFn)))
 	return decFn, nil
 }
 
