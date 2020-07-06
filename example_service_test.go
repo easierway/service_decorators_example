@@ -4,10 +4,11 @@ package service_decorators_example
 import (
 	"context"
 	"errors"
-	"github.com/easierway/g_met"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/easierway/g_met"
 
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/easierway/service_decorators"
@@ -71,7 +72,7 @@ func decorateCoreLogic(innerFn service_decorators.ServiceFunc) (service_decorato
 	decFn := rateLimitDec.Decorate(
 		circuitBreakDec.Decorate(
 			metricDec.Decorate(
-			innerFn)))
+				innerFn)))
 	return decFn, nil
 }
 
